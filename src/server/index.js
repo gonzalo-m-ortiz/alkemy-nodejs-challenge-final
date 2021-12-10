@@ -6,6 +6,7 @@ const config = require('../config');
 
 // Import Routes
 const routes = [];
+routes.push(require('../components/auth').routes);
 //routes.push(require('../components/').routes);
 
 // Create app
