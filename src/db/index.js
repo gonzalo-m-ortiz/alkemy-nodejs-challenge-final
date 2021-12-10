@@ -11,6 +11,14 @@ const sequelize = new Sequelize(config.db.connString, dbOptions);
 
 // req models
 const modelsDefiners = [
+    require('../components/users/UserModel').definer,
+    require('../components/characters/CharacterModel').definer,
+    require('../components/movies/MovieModel').definer,
+    require('../components/genres/GenreModel').definer,
+    require('../components/common/CharMovieMapModel').definer,
+    require('../components/common/GenreMovieMapModel').definer,
+    require('../components/images/ImageModel').definer,
+
     //require('../components/component/componentModel').definer,
 ];
 
