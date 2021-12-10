@@ -8,6 +8,7 @@ const config = require('../config');
 const routes = [];
 routes.push(require('../components/auth').routes);
 routes.push(require('../components/characters').routes);
+routes.push(require('../components/images').routes);
 //routes.push(require('../components/').routes);
 
 // Create app
