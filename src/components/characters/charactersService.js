@@ -11,14 +11,51 @@ const { apiHelper } = require('../../utils/helpers');
 const imagesService = require('../images/imagesService');
 const commonService = require('../common/commonService');
 
-const getAll = async () => {
+const getAll = async (dataRec) => {
+    // parse query params to correct data type
+    try {
+        dataRec = apiHelper.parseObjectProperties(dataRec, [
+            ['age', 'number'], 
+            ['weight', 'number'], 
+            ['movies', 'number'],
+        ]);
+    } catch {
+        throw new AppError(`Error parsing query params to correct dataType.`, 400);
+    }
+
+    // validate query params
+    const { name, age, weight, movies } = await validateGetAllParams(dataRec);
+
+    // define "where" applicated to sql query
+    const characterWhereClause = {}; // "main" where
+    let moviesWhereClause = undefined; // association where, undefined to avoid inner join with {}
+    if (name)
+        characterWhereClause.name = { [Op.substring]: name, };
+    else {
+        if (age)
+            characterWhereClause.age = age;
+        if (weight)
+            characterWhereClause.weight = weight;
+        if (movies)
+            moviesWhereClause = { id: movies };
+    }
+    
     // get characters list
     const characters = await models.Character.findAll({
         attributes: ['id','name'],
+        where: characterWhereClause,
         include: [
             {
                 model: models.Image, as: 'image',
                 attributes: ['url'],
+            },
+            {
+                model: models.Movie, as: 'movies',
+                attributes: [],
+                through: {
+                    attributes: [],
+                },
+                where: moviesWhereClause,
             },
         ]
     });
@@ -238,6 +275,16 @@ async function validateCharPatch(data) {
 }
 async function validateId(data) {
     const schema = characterSchema.id.required();
+    const dataValidated = await validateHelper.validateJoi(data, schema);
+    return dataValidated;
+}
+async function validateGetAllParams(data) {
+    const schema = Joi.object({
+        name: characterSchema.name,
+        age: characterSchema.age,
+        weight: characterSchema.weight,
+        movies: commonSchemas.id,
+    });
     const dataValidated = await validateHelper.validateJoi(data, schema);
     return dataValidated;
 }

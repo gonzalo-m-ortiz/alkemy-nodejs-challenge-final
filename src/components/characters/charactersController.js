@@ -2,7 +2,8 @@ const charactersService = require('./charactersService');
 const { apiHelper } = require('../../utils/helpers');
 
 const getAll = async (req, res) => {
-    const dataRes = await charactersService.getAll();
+    const dataService = apiHelper.extract(req.query, ['name', 'age', 'weight', 'movies']);
+    const dataRes = await charactersService.getAll(dataService);
     return res.status(200).json(apiHelper.resFormat(dataRes));
 };
 
