@@ -47,6 +47,46 @@ router.get('/',
     apiHelper.includeTryCatchController(charactersController.getAll));
 
 
+/*
+    auth: (any)
+        option 1: HEADER
+            "x-access-token":"eyJhbGciOiJIUzI1NiIsIn..."
+        option 2: HEADER
+            "token":"eyJhbGciOiJIUzI1NiIsIn..."
+        option 3: BODY
+            "token":"eyJhbGciOiJIUzI1NiIsIn..."
+
+    body { 
+    }
+    res {
+        data: {
+            id: int,
+            name: string,
+            age: int | null,
+            weight: int | null,
+            story: string | null,
+            image: null | {
+                id: string,
+                url: string,
+            },
+            movies: [
+                {
+                    id: int,
+                    title: string,
+                    image: null | {
+                        url: string
+                    },
+                },
+            ]
+        }
+    }
+    status 200
+*/
+router.get('/:id', 
+    auth.isAuthenticated,
+    apiHelper.includeTryCatchController(charactersController.getById));
+
+
 
 /*
     auth: (any)

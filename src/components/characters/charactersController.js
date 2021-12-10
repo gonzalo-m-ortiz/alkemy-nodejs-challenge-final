@@ -6,6 +6,12 @@ const getAll = async (req, res) => {
     return res.status(200).json(apiHelper.resFormat(dataRes));
 };
 
+const getById = async (req, res) => {
+    const { id } = req.params;
+    const dataRes = await charactersService.getById(id);
+    return res.status(200).json(apiHelper.resFormat(dataRes));
+};
+
 const create = async (req, res) => {
     const dataService = apiHelper.extract(req.body, ['name', 'age', 'weight', 'story', 'movies','imageId']);
     const dataRes = await charactersService.create(dataService);
@@ -27,6 +33,7 @@ const deleteById = async (req, res) => {
 
 module.exports = {
     getAll,
+    getById,
     create,
     patchById,
     deleteById,

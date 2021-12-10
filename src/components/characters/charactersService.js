@@ -25,6 +25,41 @@ const getAll = async () => {
     return characters;
 }
 
+const getById = async (id) => {
+    // validate id
+    await validateId(id);
+
+    // get character
+    const character = await models.Character.findByPk(id, {
+        attributes: {
+            exclude: ['imageId', 'createdAt', 'updatedAt'],
+        },
+        include: [
+            {
+                model: models.Image, as: 'image',
+                attributes: ['id','url'],
+            },
+            {
+                model: models.Movie, as: 'movies',
+                attributes: ['id','title'],
+                through: {
+                    attributes: [],
+                },
+                include: {
+                    model: models.Image, as: 'image',
+                    attributes: ['url'],
+                },
+            },
+        ],
+    });
+
+    // check if character exists
+    if (!character)
+        throw new AppError(`Character with id ${id} not found`, 404);
+
+    return character;
+}
+
 const create = async (dataRec) => {
     // validate data
     const characterData = await validateChar(dataRec);
@@ -166,7 +201,8 @@ const deleteById = async (id) => {
 }
 
 module.exports = {
-    getAll,   
+    getAll,
+    getById,
     create,
     patchById,
     deleteById,
