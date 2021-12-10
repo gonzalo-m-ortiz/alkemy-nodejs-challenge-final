@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/gonzalo-m-ortiz/alkemy-nodejs-challenge-final#readme",
   "dependencies": {
+    "@sendgrid/mail": "^7.6.0",
     "bcrypt": "^5.0.1",
     "cors": "^2.8.5",
     "dotenv": "^10.0.0",

@@ -20,4 +20,9 @@ module.exports = {
             expiresIn: '1y',
         },
     },
+    sendGrid: {
+        sendEmails: process.env.SEND_EMAILS.toLocaleLowerCase() === 'true'? true : false,
+        apiKey: process.env.SENDGRID_API_KEY,
+        defaultFromEmail: process.env.DEFAULT_FROM_EMAIL,
+    },
 };

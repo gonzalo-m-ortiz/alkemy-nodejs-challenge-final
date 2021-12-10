@@ -1,6 +1,8 @@
 const jsonWT = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const Joi = require('joi');
+const sgMail = require('@sendgrid/mail');
+const fs = require('fs').promises;
 
 const config = require('../../config');
 const {models} = require('../../db');
@@ -20,6 +22,26 @@ const register = async (dataRec) => {
 
     //create user
     const user = await models.User.create({email, password:hashedPassword});
+
+    // send welcome email to user
+    if (config.sendGrid.sendEmails) {
+        sgMail.setApiKey(config.sendGrid.apiKey);
+        const mailToSend = {
+          to: user.email,
+          from: `Disney API <${config.sendGrid.defaultFromEmail}>`,
+          subject: 'Welcome to Disney API!!! 🖐',
+          html: await fs.readFile(__dirname+'/mailsTemplate/registerMail.html', 'utf8'),
+        };
+        try {
+            await sgMail.send(mailToSend);
+        } catch (error) {
+            let errorMsg = '';
+            if (error.response) {
+                errorMsg = `message: ${error.message}; code:${error.code}; body:${error.response.body}`;
+            }
+            await errorHandler.handleMinorError(new AppError(`Register mail not sent: ${errorMsg}`, 500));
+        }
+    }
 
     const tokenPayload = {
         id: user.id,
