@@ -1,0 +1,4123 @@
+{
+	"info": {
+		"_postman_id": "97f4ac30-fba9-40e7-aab6-66b40b719e47",
+		"name": "Disney API V1",
+		"description": "# Contents\n\n*   Introduction\n*   Request\n    *   Authorization\n    *   Handle Images\n    *   Content Type\n*   Response\n    *   Content Type\n    *   Structure\n    *   Error Handling\n*   Basic CRUD\n    *   Create\n        *   Create entity associations\n    *   Update by Id\n        *   Update entity associations\n    *   Delete by Id\n    *   Get by Id\n    *   Get All\n*   Actual Endpoints\n*   Error Handling\n    \n\n# Introduction\n\nOriginally, I was going to add an introduction. Well, I couldn't think of anything.\n\nRESTful API made by Gonzalo Ortiz\n\n# Request\n\n#### Authorization\n\nALL ROUTES (except for auth) REQUIRE AUTHORIZATION.\n\nThe Authorization consist in add the user `token` to the request. You get it from the response of `\"auth/register\"` or `\"auth/login\"`. It expires in 1 year.\n\nWays to add the `token` to the request: (choose your fighter)\n\n``` json\n// In \"Headers\":\n\"token\":\"eyJhbGciOiJIUzI1NiIsIn...\",\n\"x-access-token\":\"eyJhbGciOiJIUzI1NiIsIn...\", // Recommended\n// In \"Body\":\n\"token\":\"eyJhbGciOiJIUzI1NiIsIn...\",\n\n```\n\n#### Handle Images\n\nImages are a separate entity. They have separate endpoints from the entity it belongs to.\n\nUsual Entity-Image relation:\n\n``` json\n\"myImage\": {\n  \"id\": \"\" // uuid\n  \"url\": \"\" // url image\n}\n\"myEntity\": {\n  \"id\": 1\n  \"imageId\": \"\" // uuid\n}\n\n```\n\nThe endpoints should look like this:\n\n*   Create: `POST \"images/entity\"`\n*   Update: `PUT \"images/:id\"` // same for all images\n*   Delete: `DELETE \"images/:id\"` // same for all images\n    \n\nIdeal workflow would be:\n\n1.  Starts the process of create/update an entity\n2.  User starts uploading entity image in the front-end\n3.  Once the image is uploaded, it is sent to correspondig endpoint to create the resource\n4.  The API returns the `\"id\"` of the created image\n5.  User finishes filling in the entity fields\n6.  Final request is sent for create/update entity, that req has `\"id\"` as `\"imageId\"`.\n    \n\n#### Content Type\n\nAll entities methods: `\"POST\"`, `\"PUT\"` and `\"PATCH\"` only accept `\"application/json\"`. Except for Upload and Update Images, their endpoints only accept `\"multipart/form-data\".`  \n`\"GET\"` endpoints accept any content-type.\n\n# Response\n\n#### Content Type\n\nThe content-type of all API responses is `\"application/json\"`.\n\n#### Structure\n\nAll API responses have a specific format:\n\n``` json\n// normal response\n{\n  \"type\": \"success\",\n  \"message\": \"Ok\",\n  \"data\": {\n    \"id\": 1\n  }\n}\n// error response (codes 4xx and 5xx)\n{\n  \"type\": \"error\",\n  \"message\": \"Error message here\",\n  \"data\": null\n}\n\n```\n\n`\"data\"` can only be any of these: *`NULL`*, *`Object`* or *`Array`*.  \nIn case the answer only has one field, such as `\"id\"`, `\"data\"` will be an `Object` that contains `\"id\"` property, as shown in the previous example.\n\n#### Error Handling\n\nDetailed information about error handling in \"Error Handling\" folder at the end of this docs.\n\n# Basic CRUD\n\n#### Create\n\n> POST '[http://localhost:3000/api/foo'](http://localhost:3000/api/foo')\n\nAdd the right fields to body as json.  \nOptional fields can be omitted or setted with NULL:\n\n``` json\n// option 1\n  \"paramName\": null  \n// option 2\n  // (just not adding it)\n\n```\n\n##### Create entity associations\n\nIF THE ENTITY OF THE PROVIDED ID NOT EXISTS, AN ERROR WILL BE THROWN. See Error Handling Section\n\n**Entity-Image example:**\n\n``` json\n\"imageId\": \"valid id\"\n// or\n\"imageId\": null\n\n```\n\nIf the image was created in the endpoint of another entity (see Handle Images section) an error will be thrown.  \nIf the image is already being used by another entity an error will be thrown.\n\n**Many-To-Many example:**\n\n``` json\n\"associatedEntity\": [1, 2], or 1 // valid Ids\n// or\n\"associatedEntity\": null, or [] // not add associations\n\n```\n\n#### Update by Id\n\n> PATCH '[http://localhost:3000/api/foo/:id'](http://localhost:3000/api/foo/:id')\n\nAdd the right fields to body as json.  \nThe fields that you do NOT want to modify can be omitted or added with the current value.\n\nIF NOT FIELDS ADDED, AN ERROR WILL BE THROWN. See Error Handling Section\n\n##### Update entity associations\n\nIF THE ENTITY OF THE PROVIDED ID NOT EXISTS, AN ERROR WILL BE THROWN. See Error Handling Section\n\n**Entity-Image example:**\n\n``` json\n// add image\n\"imageId\": \"valid id\"\n// delete image\n\"imageId\": null\n// to UPDATE image: (entity already has an image)\n  // option 1: (recommended)\n    // update image entity. More info in Images Folder\n  // option 2:\n    // create new image and associate it like adding new image\n\n```\n\nPossible scenarios:\n\n1.  `\"imageId\": \"valid Id\"`\n    1.  Entity HADN'T image: **new image added**\n    2.  Entity HAD image: **previous image deleted, new image added**\n2.  `\"imageId\": null`\n    1.  Entity HADN'T image: **no changes**\n    2.  Entity HAD image: **image deleted**\n\n**Many-To-Many example:**\n\n``` json\n\"associatedEntity\": [1, 2], or 1 // valids Ids\n\"associatedEntityAction\": \"add\" or \"set\" or \"remove\"  \n// \"add\" = add selected associations \n// \"set\" = replace associations with selected\n// \"remove\" = remove selected associations \n\n```\n\nTHIS ONLY CHANGE THE ASSOCIATION BETWEEN, BOTH ENTITIES NOT CHANGE.\n\nConflict scenarios\n\n1.  `\"Action\": \"add\"`\n    1.  `\"associatedEntity\" : [1, 2]`\n        1.  Entity already has the selected associations: **no changes**\n    2.  `\"associatedEntity\" : []`\n        1.  **no changes**\n2.  `\"Action\": \"set\"`\n    1.  `\"associatedEntity\" : [1, 2]`\n        1.  Entity already has all (or one) the selected associations: **no changes**\n    2.  `\"associatedEntity\" : []`\n        1.  **previous associations deleted**\n3.  `\"Action\": \"remove\"`\n    1.  `\"associatedEntity\" : [1, 2]`\n        1.  Entity already hasn't the selected associations: **no changes**\n    2.  `\"associatedEntity\" : []`\n        1.  **no changes**\n\n#### Delete by Id\n\n> DELETE '[http://localhost:3000/api/foo/:id'](http://localhost:3000/api/foo/:id')\n\n**Entity-Image association:** The image is automatically deleted when you delete the entity, but not the other way around.\n\n**Many-To-Many associations:** The associations are automatically removed (not the entity).\n\n#### Get by Id\n\n> GET '[http://localhost:3000/api/foo/:id'](http://localhost:3000/api/foo/:id')\n\n#### Get All\n\n> GET '[http://localhost:3000/api/foo'](http://localhost:3000/api/foo')\n\nSome entities allow specific query params.\n\nThere are 3 types of query params: \"**search**\", \"**filter**\" and \"**order**\".  \n**search**: works like a query filter, is usually the name. (examples below)  \n**filter**: works like a query filter. (examples below)  \n**order**: can be added alone or along with other params.\n\nIf you combine search and filter params, the filter params will be ignored.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\":\"email@example.com\",\r\n    \"password\":\"anyString\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/auth/register",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| email | string | valid email | yes |\n| password | string lenght(3-100) | any string | yes |\n\n**A Welcome Mail will be sent !!!**\n\n![](https://i.postimg.cc/vZNXWjJt/Screenshot.png)"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"email\":\"email@example.com\",\r\n    \"password\":\"anyString\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/auth/register",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"auth",
+										"register"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "263"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"107-UUivIVSrWREJ2TdyyHGSi4OgeSk\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 17:17:42 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 1,\n        \"email\": \"email@example.com\",\n        \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJlbWFpbEBleGFtcGxlLmNvbSIsImlhdCI6MTYzODk4Mzg2MiwiZXhwIjoxNjcwNTQxNDYyfQ.vBwy2PuqKTmoN-p77tsO1NpWqsg98NfeuD0F-SoBp7s\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "login",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\":\"email@example.com\",\r\n    \"password\":\"anyString\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/auth/login",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| email | string | valid email | yes |\n| password | string lenght(3-100) | any string | yes |"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"email\":\"email@example.com\",\r\n    \"password\":\"anyString\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/auth/login",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"auth",
+										"login"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "263"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"107-jxYqpmQI5NYbSrlfG5ZJwGTa9Sk\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 17:20:48 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 1,\n        \"email\": \"email@example.com\",\n        \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJlbWFpbEBleGFtcGxlLmNvbSIsImlhdCI6MTYzODk4NDA0OCwiZXhwIjoxNjcwNTQxNjQ4fQ.KHCAiLnXOUPkWpx1IeNk9fOZJrtYZC4QV9MUKQDakLk\"\n    }\n}"
+						}
+					]
+				}
+			],
+			"auth": {
+				"type": "noauth"
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Characters",
+			"item": [
+				{
+					"name": "create image character",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"description": "image file. Details in Images Docs",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/images/characters",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"images",
+								"characters"
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| image | file | character image | yes |\n\nMore info about image handling:\n\n*   Request\n    *   Handle Images\n*   Basic Crud\n    *   Create\n        *   Create entity associations\n\nInfo about the \"image\" Param in Images Folder"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "image",
+											"description": "image file. Details in Images Docs",
+											"type": "file",
+											"src": "/C:/git-repositories/alkemy-nodejs-challenge/test/sample-files/valid-image.jpg"
+										}
+									]
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/images/characters",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"images",
+										"characters"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "167"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"a7-OKO++1NeqNFx3AUD1/RrdS9Uhgw\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 17:23:47 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": \"ce40c178-1c64-46b0-979c-75f30d21db75\",\n        \"url\": \"http://localhost:3000/static/characters/images/valid-image-766028845.jpg\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "create character",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"name\": \"char name, any string\",\r\n    \"age\": 10,\r\n    \"weight\": 25.6,\r\n    \"story\": \"char story, any string\",\r\n    \"movies\": [1],\r\n    \"imageId\": \"ce40c178-1c64-46b0-979c-75f30d21db75\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/characters",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"characters"
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| name | string length(1-100) |  | yes |\n| age | int >= 0 |  |  |\n| weight | float >= 0 |  |  |\n| story | string length(0-) |  |  |\n| movies | int\\[\\] or int | moviesId |  |\n| imageId | string UUIDv4 |  |  |\n\nMore info about create in:\n\n*   Basic CRUD\n    *   Create"
+					},
+					"response": [
+						{
+							"name": "full character ex",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"name\": \"char name, any string\",\r\n    \"age\": 10,\r\n    \"weight\": 25.6,\r\n    \"story\": \"char story, any string\",\r\n    \"movies\": [1],\r\n    \"imageId\": \"ce40c178-1c64-46b0-979c-75f30d21db75\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/characters",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "49"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"31-1e7w7yYxt9lycapEaKU989hu4/8\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 17:34:05 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 1\n    }\n}"
+						},
+						{
+							"name": "only name ex",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"name\": \"unknown character\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/characters",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "49"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"31-F90uL8WIDW+jwMcTisk8TYhus/c\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:17:00 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 3\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "update character",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"name\": \"updated char1\",\r\n    \"age\": 19,\r\n    \"weight\": 39,\r\n    \"story\": \"updated random story\",\r\n    \"movies\": [],\r\n    \"moviesAction\": \"add\",\r\n    \"imageId\": null\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/characters/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"characters",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": null,
+									"description": "int (characterId)"
+								}
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| name | string length(1-100) | can't be setted *NULL* |  |\n| age | int >= 0 |  |  |\n| weight | float >= 0 |  |  |\n| story | string length(0-) |  |  |\n| movies | int\\[\\] or int | moviesId |  |\n| moviesAction | string | \"add\", \"set\" or \"remove\" | only if \"movies\" provided |\n| imageId | string UUIDv4 |  |  |\n\nMore info about update in:\n\n*   Basic CRUD\n    *   Update by Id"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"name\": \"updated char1\",\r\n    \"age\": 19,\r\n    \"weight\": 39,\r\n    \"story\": \"updated random story\",\r\n    \"movies\": [],\r\n    \"moviesAction\": \"add\",\r\n    \"imageId\": \"7ca99a00-d5d9-4e17-b167-1d4ca1a55c96\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/characters/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1",
+											"description": "int (characterId)"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "45"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2d-suIFoqHOequmzqUw+ichQjvNl9I\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 01:27:25 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "delete character",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/characters/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"characters",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": null,
+									"description": "int (characterId)"
+								}
+							]
+						},
+						"description": "More info about delete in:\n\n*   Basic CRUD\n    *   Delete by Id"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/characters/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "2",
+											"description": "int (characterId)"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "45"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2d-suIFoqHOequmzqUw+ichQjvNl9I\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:14:08 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "get character",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/characters/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"characters",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "",
+									"description": "int (characterId)"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "char with associations ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/characters/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1",
+											"description": "int (characterId)"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "412"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"19c-LnOgBZv/JwbmC5eJFTBVHum8K2o\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 17:34:39 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 1,\n        \"name\": \"char name, any string\",\n        \"age\": 10,\n        \"weight\": 25.6,\n        \"story\": \"char story, any string\",\n        \"image\": {\n            \"id\": \"ce40c178-1c64-46b0-979c-75f30d21db75\",\n            \"url\": \"http://localhost:3000/static/characters/images/valid-image-766028845.jpg\"\n        },\n        \"movies\": [\n            {\n                \"id\": 1,\n                \"title\": \"movie title, any string\",\n                \"image\": {\n                    \"url\": \"http://localhost:3000/static/movies/images/valid-image-964908915.jpg\"\n                }\n            }\n        ]\n    }\n}"
+						},
+						{
+							"name": "only name char ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/characters/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "3",
+											"description": "int (characterId)"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "139"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"8b-chZZLXHBcPHb7yiqDhZiHkjTGKo\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:18:23 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 3,\n        \"name\": \"unknown character\",\n        \"age\": null,\n        \"weight\": null,\n        \"story\": null,\n        \"image\": null,\n        \"movies\": []\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "list characters + params",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/characters?movies=1&age=10&weight=30&name=char name",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"characters"
+							],
+							"query": [
+								{
+									"key": "movies",
+									"value": "1",
+									"description": "int (movieId), \"filter\" param"
+								},
+								{
+									"key": "age",
+									"value": "10",
+									"description": "int, \"filter\" param"
+								},
+								{
+									"key": "weight",
+									"value": "30",
+									"description": "float, \"filter\" param"
+								},
+								{
+									"key": "name",
+									"value": "char name",
+									"description": "string, \"search\" param"
+								}
+							]
+						},
+						"description": "Query Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| name | string | \"search\" param |  |\n| age | int | \"filter\" param |  |\n| weight | float | \"filter\" param |  |\n| movies | int | filter\" param, movieId |  |\n\nMore info about list in:\n\n*   Basic CRUD\n    *   Get All"
+					},
+					"response": [
+						{
+							"name": "no params ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/characters",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters"
+									],
+									"query": [
+										{
+											"key": "movies",
+											"value": "1",
+											"description": "int (movieId), \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "age",
+											"value": "10",
+											"description": "int, \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "weight",
+											"value": "30",
+											"description": "float, \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "char name",
+											"description": "string, \"search\" param",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "222"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"de-ZGDh1iIE33tP/rg7GcHV7lpnpWc\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:20:07 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"name\": \"char name, any string\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/characters/images/valid-image-766028845.jpg\"\n            }\n        },\n        {\n            \"id\": 3,\n            \"name\": \"unknown character\",\n            \"image\": null\n        }\n    ]\n}"
+						},
+						{
+							"name": "search by name ex 1",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/characters?name=char",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters"
+									],
+									"query": [
+										{
+											"key": "movies",
+											"value": "1",
+											"description": "int (movieId), \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "age",
+											"value": "10",
+											"description": "int, \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "weight",
+											"value": "30",
+											"description": "float, \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "char",
+											"description": "string, \"search\" param"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "222"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"de-ZGDh1iIE33tP/rg7GcHV7lpnpWc\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:21:04 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"name\": \"char name, any string\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/characters/images/valid-image-766028845.jpg\"\n            }\n        },\n        {\n            \"id\": 3,\n            \"name\": \"unknown character\",\n            \"image\": null\n        }\n    ]\n}"
+						},
+						{
+							"name": "search by name ex 2",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/characters?name=char name",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters"
+									],
+									"query": [
+										{
+											"key": "movies",
+											"value": "1",
+											"description": "int (movieId), \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "age",
+											"value": "10",
+											"description": "int, \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "weight",
+											"value": "30",
+											"description": "float, \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "char name",
+											"description": "string, \"search\" param"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "173"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"ad-DssS/cy1XGxOrtoCvCj0leAmmaA\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:21:42 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"name\": \"char name, any string\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/characters/images/valid-image-766028845.jpg\"\n            }\n        }\n    ]\n}"
+						},
+						{
+							"name": "filters params ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/characters?movies=1&age=10",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters"
+									],
+									"query": [
+										{
+											"key": "movies",
+											"value": "1",
+											"description": "int (movieId), \"filter\" param"
+										},
+										{
+											"key": "age",
+											"value": "10",
+											"description": "int, \"filter\" param"
+										},
+										{
+											"key": "weight",
+											"value": "30",
+											"description": "float, \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "char name",
+											"description": "string, \"search\" param",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "173"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"ad-DssS/cy1XGxOrtoCvCj0leAmmaA\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:22:46 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"name\": \"char name, any string\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/characters/images/valid-image-766028845.jpg\"\n            }\n        }\n    ]\n}"
+						},
+						{
+							"name": "override filter params with search ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/characters?movies=1&age=10&name=unknown",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"characters"
+									],
+									"query": [
+										{
+											"key": "movies",
+											"value": "1",
+											"description": "int (movieId), \"filter\" param"
+										},
+										{
+											"key": "age",
+											"value": "10",
+											"description": "int, \"filter\" param"
+										},
+										{
+											"key": "weight",
+											"value": "30",
+											"description": "float, \"filter\" param",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "unknown",
+											"description": "string, \"search\" param"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "91"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"5b-i/Bjt3NqK9r4OJHmNiHnOS/87tA\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:23:43 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 3,\n            \"name\": \"unknown character\",\n            \"image\": null\n        }\n    ]\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Movies",
+			"item": [
+				{
+					"name": "create image movie",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"description": "image file. Details in Images Docs",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/images/movies",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"images",
+								"movies"
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| image | file | movie image | yes |\n\nMore info about image handling:\n\n*   Request\n    *   Handle Images\n*   Basic Crud\n    *   Create\n        *   Create entity associations\n\nInfo about the \"image\" Param in Images Folder"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "image",
+											"description": "image file. Details in Images Docs",
+											"type": "file",
+											"src": "/C:/git-repositories/alkemy-nodejs-challenge/test/sample-files/valid-image.jpg"
+										}
+									]
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/images/movies",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"images",
+										"movies"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "163"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"a3-X7R5GtjC+CE0Et1wHnbgiiCiXWs\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:43:05 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": \"2b7ed7a8-48f6-4442-bd0f-32eb4faff346\",\n        \"url\": \"http://localhost:3000/static/movies/images/valid-image-120563669.jpg\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "create movie",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"title\": \"movie title, any string\",\r\n    \"releaseDate\": \"2021-01-22\",\r\n    \"rating\": 4.5,\r\n    \"characters\": [],\r\n    \"genres\": [1],\r\n    \"imageId\": \"5f5c8d57-a6d0-4cf4-97ae-1451ad6de675\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/movies",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"movies"
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| title | string length(1-150) |  | yes |\n| releaseDate | string (yyyy-mm-dd) |  |  |\n| rating | float between(1-5) |  |  |\n| character | int\\[\\] or int | charactersId |  |\n| genres | int\\[\\] or int | genresId |  |\n| imageId | string UUIDv4 |  |  |\n\nMore info about create in:\n\n*   Basic CRUD\n    *   Create"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"title\": \"movie title, any string\",\r\n    \"releaseDate\": \"2021-01-22\",\r\n    \"rating\": 4.5,\r\n    \"characters\": [],\r\n    \"genres\": [1],\r\n    \"imageId\": \"2b7ed7a8-48f6-4442-bd0f-32eb4faff346\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/movies",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "49"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"31-1e7w7yYxt9lycapEaKU989hu4/8\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:43:36 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 1\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "update movie",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"title\": \"updated movie1\",\r\n    \"releaseDate\": null,\r\n    \"rating\": 4.9,\r\n    \"characters\": [],\r\n    \"charactersAction\": \"add\",\r\n    \"genres\": [],\r\n    \"genresAction\": \"add\",\r\n    \"imageId\": null\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/movies/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"movies",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": null,
+									"description": "int (movieId)"
+								}
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| title | string length(1-150) | can't be setted *NULL* | yes |\n| releaseDate | string (yyyy-mm-dd) |  |  |\n| rating | float between(1-5) |  |  |\n| characters | int\\[\\] or int | charactersId |  |\n| charactersAction | string | \"add\", \"set\" or \"remove\" | only if \"characters\" provided |\n| genres | int\\[\\] or int | genresId |  |\n| genresAction | string | \"add\", \"set\" or \"remove\" | only if \"genres\" provided |\n| imageId | string UUIDv4 |  |  |\n\nMore info about update in:\n\n*   Basic CRUD\n    *   Update by Id"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"title\": \"updated movie1\",\r\n    \"releaseDate\": \"2018-10-03\",\r\n    \"rating\": 2.1,\r\n    \"characters\": [1],\r\n    \"charactersAction\": \"set\",\r\n    \"genres\": [1],\r\n    \"genresAction\": \"remove\",\r\n    \"imageId\": null\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/movies/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "45"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2d-suIFoqHOequmzqUw+ichQjvNl9I\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:54:21 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "delete movie",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/movies/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"movies",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": null,
+									"description": "int (movieId)"
+								}
+							]
+						},
+						"description": "More info about delete in:\n\n*   Basic CRUD\n    *   Delete by Id"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "45"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2d-suIFoqHOequmzqUw+ichQjvNl9I\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:54:35 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "get movie",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/movies/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"movies",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": null,
+									"description": "int (movieId)"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "movie with associations ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "539"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"21b-bwmWYOt2fqvcRBmeRF2yEVObOCU\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:45:16 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 1,\n        \"title\": \"movie title, any string\",\n        \"releaseDate\": \"2021-01-22\",\n        \"rating\": 4.5,\n        \"image\": {\n            \"id\": \"2b7ed7a8-48f6-4442-bd0f-32eb4faff346\",\n            \"url\": \"http://localhost:3000/static/movies/images/valid-image-120563669.jpg\"\n        },\n        \"characters\": [\n            {\n                \"id\": 1,\n                \"name\": \"char name, any string\",\n                \"image\": {\n                    \"url\": \"http://localhost:3000/static/characters/images/valid-image-485401197.jpg\"\n                }\n            }\n        ],\n        \"genres\": [\n            {\n                \"id\": 1,\n                \"name\": \"genre name, any string\",\n                \"image\": {\n                    \"url\": \"http://localhost:3000/static/genres/images/valid-image-225743673.jpg\"\n                }\n            }\n        ]\n    }\n}"
+						},
+						{
+							"name": "movie no associations ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "2"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "150"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"96-SOZmPPBh6V2PtcJLzXHfOkxhRg0\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:46:11 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 2,\n        \"title\": \"movie only title\",\n        \"releaseDate\": null,\n        \"rating\": null,\n        \"image\": null,\n        \"characters\": [],\n        \"genres\": []\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "list movies + params",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/movies?genre=&order=ASC&name",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"movies"
+							],
+							"query": [
+								{
+									"key": "genre",
+									"value": "",
+									"description": "int (genreId), filter "
+								},
+								{
+									"key": "order",
+									"value": "ASC",
+									"description": "string ASC | DESC, order by releaseDate"
+								},
+								{
+									"key": "name",
+									"value": null,
+									"description": "string (title), search"
+								}
+							]
+						},
+						"description": "Query Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| name | string | \"search\" param, title |  |\n| genre | int | \"filter\" param, genreId |  |\n| order | string ASC or DESC | \"order\" param, order by releaseDate |  |\n\nMore info about list in:\n\n*   Basic CRUD\n    *   Get All"
+					},
+					"response": [
+						{
+							"name": "no params ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies"
+									],
+									"query": [
+										{
+											"key": "genre",
+											"value": "",
+											"description": "int genreId, filter ",
+											"disabled": true
+										},
+										{
+											"key": "order",
+											"value": "ASC",
+											"description": "string ASC | DESC, order",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": null,
+											"disabled": true
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "267"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"10b-wogLeSxAzziagHEzQKhpFaoFQ6M\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:46:53 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"title\": \"movie title, any string\",\n            \"releaseDate\": \"2021-01-22\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/movies/images/valid-image-120563669.jpg\"\n            }\n        },\n        {\n            \"id\": 2,\n            \"title\": \"movie only title\",\n            \"releaseDate\": null,\n            \"image\": null\n        }\n    ]\n}"
+						},
+						{
+							"name": "search by name ex 1",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies?name=title",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies"
+									],
+									"query": [
+										{
+											"key": "genre",
+											"value": "",
+											"description": "int genreId, filter ",
+											"disabled": true
+										},
+										{
+											"key": "order",
+											"value": "",
+											"description": "string ASC | DESC, order",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "title"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "267"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"10b-wogLeSxAzziagHEzQKhpFaoFQ6M\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:49:31 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"title\": \"movie title, any string\",\n            \"releaseDate\": \"2021-01-22\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/movies/images/valid-image-120563669.jpg\"\n            }\n        },\n        {\n            \"id\": 2,\n            \"title\": \"movie only title\",\n            \"releaseDate\": null,\n            \"image\": null\n        }\n    ]\n}"
+						},
+						{
+							"name": "search by name ex 2",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies?name=nly",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies"
+									],
+									"query": [
+										{
+											"key": "genre",
+											"value": "",
+											"description": "int genreId, filter ",
+											"disabled": true
+										},
+										{
+											"key": "order",
+											"value": "",
+											"description": "string ASC | DESC, order",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "nly"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "110"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"6e-12zmLZCbIwvNu249SuAbyFxd5Aw\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:49:57 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 2,\n            \"title\": \"movie only title\",\n            \"releaseDate\": null,\n            \"image\": null\n        }\n    ]\n}"
+						},
+						{
+							"name": "filter params ex 1",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies?genre=1",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies"
+									],
+									"query": [
+										{
+											"key": "genre",
+											"value": "1",
+											"description": "int genreId, filter "
+										},
+										{
+											"key": "order",
+											"value": "",
+											"description": "string ASC | DESC, order",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "199"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"c7-zK8IpZlhKkZNhRhD8ziRND13N9Q\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:51:34 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"title\": \"movie title, any string\",\n            \"releaseDate\": \"2021-01-22\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/movies/images/valid-image-120563669.jpg\"\n            }\n        }\n    ]\n}"
+						},
+						{
+							"name": "filter params ex 2",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies?genre=90",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies"
+									],
+									"query": [
+										{
+											"key": "genre",
+											"value": "90",
+											"description": "int genreId, filter "
+										},
+										{
+											"key": "order",
+											"value": "",
+											"description": "string ASC | DESC, order",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "43"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2b-TjkKtkmErYWR4oOFCaAt7uonXvQ\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:51:53 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": []\n}"
+						},
+						{
+							"name": "override filer params ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies?genre=90&name=movie",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies"
+									],
+									"query": [
+										{
+											"key": "genre",
+											"value": "90",
+											"description": "int genreId, filter "
+										},
+										{
+											"key": "order",
+											"value": "",
+											"description": "string ASC | DESC, order",
+											"disabled": true
+										},
+										{
+											"key": "name",
+											"value": "movie"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "267"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"10b-wogLeSxAzziagHEzQKhpFaoFQ6M\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:52:12 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"title\": \"movie title, any string\",\n            \"releaseDate\": \"2021-01-22\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/movies/images/valid-image-120563669.jpg\"\n            }\n        },\n        {\n            \"id\": 2,\n            \"title\": \"movie only title\",\n            \"releaseDate\": null,\n            \"image\": null\n        }\n    ]\n}"
+						},
+						{
+							"name": "order ASC ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies?order=ASC",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies"
+									],
+									"query": [
+										{
+											"key": "genre",
+											"value": "90",
+											"description": "int genreId, filter ",
+											"disabled": true
+										},
+										{
+											"key": "order",
+											"value": "ASC",
+											"description": "string ASC | DESC, order"
+										},
+										{
+											"key": "name",
+											"value": "movie",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "267"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"10b-wogLeSxAzziagHEzQKhpFaoFQ6M\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:52:39 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"title\": \"movie title, any string\",\n            \"releaseDate\": \"2021-01-22\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/movies/images/valid-image-120563669.jpg\"\n            }\n        },\n        {\n            \"id\": 2,\n            \"title\": \"movie only title\",\n            \"releaseDate\": null,\n            \"image\": null\n        }\n    ]\n}"
+						},
+						{
+							"name": "order DESC ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/movies?order=DESC",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"movies"
+									],
+									"query": [
+										{
+											"key": "genre",
+											"value": "90",
+											"description": "int genreId, filter ",
+											"disabled": true
+										},
+										{
+											"key": "order",
+											"value": "DESC",
+											"description": "string ASC | DESC, order"
+										},
+										{
+											"key": "name",
+											"value": "movie",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "267"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"10b-HHEgGKzu9/cg99jWqQ7aXm0r9BE\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:52:53 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 2,\n            \"title\": \"movie only title\",\n            \"releaseDate\": null,\n            \"image\": null\n        },\n        {\n            \"id\": 1,\n            \"title\": \"movie title, any string\",\n            \"releaseDate\": \"2021-01-22\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/movies/images/valid-image-120563669.jpg\"\n            }\n        }\n    ]\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Genres",
+			"item": [
+				{
+					"name": "create image genre",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"description": "image file. Details in Images Docs",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/images/genres",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"images",
+								"genres"
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| image | file | genre image | yes |\n\nMore info about image handling:\n\n*   Request\n    *   Handle Images\n*   Basic Crud\n    *   Create\n        *   Create entity associations\n\nInfo about the \"image\" Param in Images Folder"
+					},
+					"response": [
+						{
+							"name": "create image genre example",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "image",
+											"description": "image file. Details in Images Docs",
+											"type": "file",
+											"src": "/C:/git-repositories/alkemy-nodejs-challenge/test/sample-files/valid-image.jpg"
+										}
+									]
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/images/genres",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"images",
+										"genres"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "163"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"a3-TEkjH7PDPYoYfGLFemjxF1JR8YU\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 17:28:56 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": \"86f8ad81-6815-49fa-ab9d-4cf3e8bd5c92\",\n        \"url\": \"http://localhost:3000/static/genres/images/valid-image-593464516.jpg\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "create genre",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"name\": \"genre name, any string\",\r\n    \"movies\": [],\r\n    \"imageId\": \"86f8ad81-6815-49fa-ab9d-4cf3e8bd5c92\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/genres",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"genres"
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| name | string length(1-150) |  | yes |\n| movies | int\\[\\] or int | moviesId |  |\n| imageId | string UUIDv4 |  |  |\n\nMore info about create in:\n\n*   Basic CRUD\n    *   Create"
+					},
+					"response": [
+						{
+							"name": "create genre example",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"name\": \"genre name, any string\",\r\n    \"movies\": [],\r\n    \"imageId\": \"86f8ad81-6815-49fa-ab9d-4cf3e8bd5c92\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/genres",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "49"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"31-1e7w7yYxt9lycapEaKU989hu4/8\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 17:30:05 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 1\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "update genre",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"name\": \"updated genre\",\r\n    \"movies\": [],\r\n    \"moviesAction\": \"add\",\r\n    \"imageId\": null\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/genres/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"genres",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": null,
+									"description": "int (genreId)"
+								}
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| name | string length(1-150) | can't be setted *NULL* |  |\n| movies | int\\[\\] or int | moviesId |  |\n| moviesAction | string | \"add\", \"set\" or \"remove\" | only if \"movies\" provided |\n| imageId | string UUIDv4 |  |  |\n\nMore info about update in:\n\n*   Basic CRUD\n    *   Update by Id"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"name\": \"updated genre\",\r\n    \"movies\": [],\r\n    \"moviesAction\": \"set\",\r\n    \"imageId\": null\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/genres/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "45"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2d-suIFoqHOequmzqUw+ichQjvNl9I\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:35:05 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "delete genre",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/genres/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"genres",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": null,
+									"description": "int (genreId)"
+								}
+							]
+						},
+						"description": "More info about delete in:\n\n*   Basic CRUD\n    *   Delete by Id"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/genres/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1",
+											"description": "int (genreId)"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "45"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2d-suIFoqHOequmzqUw+ichQjvNl9I\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:36:19 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "get genre",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/genres/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"genres",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": null,
+									"description": "int (genreId)"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "genre with associations ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/genres/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1",
+											"description": "int (genreId)"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "353"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"161-BIjprJL/i+6xpgkoR2sfG21g5fA\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:30:33 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 1,\n        \"name\": \"genre name, any string\",\n        \"image\": {\n            \"id\": \"86f8ad81-6815-49fa-ab9d-4cf3e8bd5c92\",\n            \"url\": \"http://localhost:3000/static/genres/images/valid-image-593464516.jpg\"\n        },\n        \"movies\": [\n            {\n                \"id\": 1,\n                \"title\": \"movie title, any string\",\n                \"image\": {\n                    \"url\": \"http://localhost:3000/static/movies/images/valid-image-964908915.jpg\"\n                }\n            }\n        ]\n    }\n}"
+						},
+						{
+							"name": "genre no associations ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/genres/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "2",
+											"description": "int (genreId)"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "103"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"67-1RymJRHeEYJ6ZlDhzPPojBmQouw\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:31:17 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"id\": 2,\n        \"name\": \"genre with no image\",\n        \"image\": null,\n        \"movies\": []\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "list genre",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/genres",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"genres"
+							]
+						},
+						"description": "More info about list in:\n\n*   Basic CRUD\n    *   Get All"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/genres",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "221"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"dd-cJOEyaOIMHwsFUlPPH6liZFpA6U\""
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 08 Dec 2021 18:29:55 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"name\": \"genre name, any string\",\n            \"image\": {\n                \"url\": \"http://localhost:3000/static/genres/images/valid-image-593464516.jpg\"\n            }\n        },\n        {\n            \"id\": 2,\n            \"name\": \"genre with no image\",\n            \"image\": null\n        }\n    ]\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Images",
+			"item": [
+				{
+					"name": "update image",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"description": "image file. Details in Images Docs",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/images/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"images",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": null,
+									"description": "string UUIDv4 (imageId)"
+								}
+							]
+						},
+						"description": "Params info:\n\n| **name** | **type** | **description** | **required** |\n| --- | --- | --- | --- |\n| image | file | entity image | yes |"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "image",
+											"description": "image file. Details in Images Docs",
+											"type": "file",
+											"src": "/C:/git-repositories/alkemy-nodejs-challenge/test/sample-files/valid-image.jpg"
+										}
+									]
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/images/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"images",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "e5014eef-75a4-4df3-b416-8d762faf5d32",
+											"description": "string UUIDv4 (imageId)"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "119"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"77-uYt1JzGDwP6cffDvHjBgniQjylA\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 16:33:55 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": {\n        \"url\": \"http://localhost:3000/static/genres/images/valid-image-932554310.jpg\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "delete image",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/images/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"images",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "",
+									"description": "string UUIDv4 (imageId)"
+								}
+							]
+						},
+						"description": "More info about delete in:\n\n*   Basic CRUD\n    *   Delete by Id"
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/images/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"images",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "45813f22-85e3-4f5f-a5c2-31389b0b640d",
+											"description": "string UUIDv4 (imageId)"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "45"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2d-suIFoqHOequmzqUw+ichQjvNl9I\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 09 Dec 2021 15:59:08 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"success\",\n    \"message\": \"Ok\",\n    \"data\": null\n}"
+						}
+					]
+				}
+			],
+			"description": "### Upload Images\n\n(For all entities images is the same)\n\n**Request Content-type: \"**multipart/form-data\"\n\n**Allowed extensions:** jpeg, jpg, png, gif\n\n**Max file size:** 3000000 Bytes, 2.861 MB\n\n**File name:** will be formatted adding random numbers at the end\n\nErrors uploading images in Error Handling section at the end of this doc"
+		},
+		{
+			"name": "Error Handling",
+			"item": [
+				{
+					"name": "400 Validation Error",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"name\": \"MORE THAN 150 CHARACTERS STRING .......................................................................................................................\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/genres",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"genres"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"name\": \"MORE THAN 150 CHARACTERS STRING .......................................................................................................................\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/genres",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "130"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"82-5OSUD/jvN383uUyULpUvo4ZucHM\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 10 Dec 2021 05:16:27 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"error\",\n    \"message\": \"Validate Error. Detail: \\\"name\\\" length must be less than or equal to 150 characters long\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "400 Invalid Image",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/images/genres",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"images",
+								"genres"
+							]
+						},
+						"description": "Image params in Images Folder"
+					},
+					"response": [
+						{
+							"name": "basic ex file too large",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "image",
+											"type": "file",
+											"src": "/C:/git-repositories/alkemy-nodejs-challenge/test/sample-files/invalid-image.jpg"
+										}
+									]
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/images/genres",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"images",
+										"genres"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "55"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"37-XTLLHMUVJI5VA7FJXQIRLxQ1cg4\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 10 Dec 2021 05:14:10 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"error\",\n    \"message\": \"File too large\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "404 Associate not existing entity",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"name\": \"genre name, any string\",\r\n    \"movies\": [],\r\n    \"imageId\": \"86f8ad81-6815-49fa-ab9d-4cf3e8bd5c93\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/genres",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"genres"
+							]
+						},
+						"description": "(Same error in Update by Id)  \nIf the associated entities don't exist or are invalid, the entire action (create/update) will not be performed."
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"name\": \"genre name, any string\",\r\n    \"movies\": [],\r\n    \"imageId\": \"86f8ad81-6815-49fa-ab9d-4cf3e8bd5c93\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/genres",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres"
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "120"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"78-YIKUe0nY7WGPeojE4clmT2Fq6gM\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 10 Dec 2021 05:13:16 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"error\",\n    \"message\": \"Image with id 86f8ad81-6815-49fa-ab9d-4cf3e8bd5c93 not found. Genre not created\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "400 Not fields to update",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/genres/:id",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"genres",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						},
+						"description": "Depends on your logic, this might not be an error.\n\nThe message is always the same for all entities."
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:3000/api/genres/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "67"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"43-/T5cIt2KDvk+AI3PjxhsjOpkEII\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 10 Dec 2021 05:12:10 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"error\",\n    \"message\": \"No data to update provided\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "404 Route not found",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/randomRoute",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"randomRoute"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/randomRoute",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"randomRoute"
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "56"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"38-ya9ngbPIFOH9uU3c8kLCr30Bqyk\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 10 Dec 2021 05:10:47 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"error\",\n    \"message\": \"Route not found\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "404 Resource not found",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": null,
+						"description": "Same error at: \"Get by Id\", \"Update by Id\", \"Delete by Id\""
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/genres/:id",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "66"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"42-wRw6uM4TdFBFxrchAtfpyE5+8z0\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 10 Dec 2021 05:10:07 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"error\",\n    \"message\": \"Genre with id 1 not found\",\n    \"data\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "5xx Server Error",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": null,
+						"description": "(This error was generated on purpose, at the moment of this words i don't know any way to replicate it)\n\nFor security reasons the message is always the same. Internally the API collect the actual reason."
+					},
+					"response": [
+						{
+							"name": "basic ex",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:3000/api/genres",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"genres"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "74"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"4a-C5KKD3uyfBveUy5W9TaT6csmRkI\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 10 Dec 2021 05:07:07 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"type\": \"error\",\n    \"message\": \"Server failed handle your request\",\n    \"data\": null\n}"
+						}
+					]
+				}
+			],
+			"description": "Common Errors"
+		}
+	],
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "value",
+				"value": "{{token}}",
+				"type": "string"
+			},
+			{
+				"key": "in",
+				"value": "header",
+				"type": "string"
+			},
+			{
+				"key": "key",
+				"value": "x-access-token",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "token",
+			"value": ""
+		}
+	]
+}
