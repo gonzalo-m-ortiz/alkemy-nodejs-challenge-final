@@ -28,12 +28,13 @@ El propósito del proyecto es desarrollar una RESTful API que cumpla los [requis
 
 #### Resumen <a name="descProyecto-resumen"></a>
 
-Para hacer un resumen, sería crear un servidor que en Node utilizando como ejes principales Express y Sequelize. El servidor expondría una API con CRUD completos de algunas entidades. Estas entidades tienen imágenes asociadas y están relacionadas entre sí. Sus rutas se protegen con autenticación que se obtiene en los endpoint de Registro e Inicio de Sesión.
+Crear un servidor en Node utilizando como ejes principales Express y Sequelize. El servidor expondría varios "CRUDs" de algunas entidades. Las entidades pueden tener imágenes y están relacionadas entre sí. Las rutas se protegen con autenticación que se obtiene en los endpoints de "Registro" e "Inicio de Sesión".
 
 
 #### Repositorio Anterior <a name="descProyecto-repo"></a>
 
-Aclaro que la aplicación se desarrolló en otro repositorio. El propósito de crear este es ordenar mejor los commits según los requisitos, para que resulte más sencillo evaluar el proyecto. Hubo algunos cosas que hice por primera vez, como manejar imágenes, que provocaron hacer modificaciones sobre el código ya hecho. 
+Aclaro que la aplicación se desarrolló en otro repositorio. El propósito de crear este es ordenar mejor los commits según los requisitos, para que resulte más sencillo evaluar el proyecto. Hubo algunas cosas que hice por primera vez, como manejar imágenes, que provocaron hacer modificaciones sobre el código ya hecho. 
+
 Dejo el [repositorio anterior][repositorioOriginal] por si se quiere ver el orden original del código.
 
 
