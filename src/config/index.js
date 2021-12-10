@@ -12,4 +12,12 @@ module.exports = {
         schema:'public',
     },
     env: process.env.ENV || 'dev', // prod, dev, test
+    auth: {
+        saltRounds: parseInt(process.env.SALT_ROUNDS) || 10,
+        tokenKey: process.env.TOKEN_KEY || 'super-super-secret',
+        tokenOptions: {
+            algorithm: process.env.TOKEN_ALGORITHM || 'HS256',
+            expiresIn: '1y',
+        },
+    },
 };
