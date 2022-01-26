@@ -5,7 +5,6 @@
 * [Descripción del Proyecto](#descProyecto)
     + [Propósito](#descProyecto-proposito)
     + [Resumen](#descProyecto-resumen)
-    + [Repositorio Anterior](#descProyecto-repo)
 * [Documentación API](#docAPI)
 * [Documentación Project Structure](#docPJ)
 * [Instalación](#inst)
@@ -29,15 +28,6 @@ El propósito del proyecto es desarrollar una RESTful API que cumpla los [requis
 #### Resumen <a name="descProyecto-resumen"></a>
 
 Crear un servidor en Node utilizando como ejes principales Express y Sequelize. El servidor expondría varios "CRUDs" de algunas entidades. Las entidades pueden tener imágenes y están relacionadas entre sí. Las rutas se protegen con autenticación que se obtiene en los endpoints de "Registro" e "Inicio de Sesión".
-
-
-#### Repositorio Anterior <a name="descProyecto-repo"></a>
-
-Aclaro que la aplicación se desarrolló en otro repositorio. El propósito de crear este es ordenar mejor los commits según los requisitos, para que resulte más sencillo evaluar el proyecto. Hubo algunas cosas que hice por primera vez, como manejar imágenes, que provocaron hacer modificaciones sobre el código ya hecho. 
-
-Dejo el [repositorio anterior][repositorioOriginal] por si se quiere ver el orden original del código.
-
-
 
 
 ## Documentación API <a name="docAPI"></a>
@@ -108,7 +98,6 @@ npm test
 
 
 [challengeDocumentLink]: https://github.com/gonzalo-m-ortiz/alkemy-nodejs-challenge-final/tree/master/docs/Challenge_Backend_Node.pdf
-[repositorioOriginal]: https://github.com/gonzalo-m-ortiz/alkemy-nodejs-challenge
 [docAPIPostman]: https://documenter.getpostman.com/view/13920110/UVR4MpkG
 [docProjStruc]: https://github.com/gonzalo-m-ortiz/alkemy-nodejs-challenge-final/tree/master/docs/projectStructure.md
 [postmanCollection]: https://github.com/gonzalo-m-ortiz/alkemy-nodejs-challenge-final/tree/master/docs/postman_collection.json
